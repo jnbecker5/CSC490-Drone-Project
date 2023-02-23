@@ -1,3 +1,3 @@
-# CSC490-Drone-Project
+# Tello-Drone-Project
 
 Currently in the works.
