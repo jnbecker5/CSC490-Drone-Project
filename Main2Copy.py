@@ -4,6 +4,7 @@ import time
 from time import sleep
 import cv2
 import numpy as np
+#import ColorSlider
 from threading import Thread
 
 
@@ -19,6 +20,30 @@ dist = 50
 cX = 0
 cY = 0
 angle = 10
+
+def nothing(x):
+    pass
+
+cv2.namedWindow('image')
+
+# create trackbars for color change
+cv2.createTrackbar('HMin', 'image', 0, 179, nothing)  # Hue is from 0-179 for Opencv
+cv2.createTrackbar('SMin', 'image', 0, 255, nothing)
+cv2.createTrackbar('VMin', 'image', 0, 255, nothing)
+cv2.createTrackbar('HMax', 'image', 0, 179, nothing)
+cv2.createTrackbar('SMax', 'image', 0, 255, nothing)
+cv2.createTrackbar('VMax', 'image', 0, 255, nothing)
+
+# Set default value for MAX HSV trackbars.
+cv2.setTrackbarPos('HMax', 'image', 179)
+cv2.setTrackbarPos('SMax', 'image', 255)
+cv2.setTrackbarPos('VMax', 'image', 255)
+
+# Initialize to check if HSV min/max value changes
+hMin = sMin = vMin = hMax = sMax = vMax = 0
+phMin = psMin = pvMin = phMax = psMax = pvMax = 0
+
+
 
 
 def command():
@@ -65,12 +90,41 @@ while True:
     height = 480
     img = cv2.resize(img, (width, height))
 
-    ORANGE_MIN = np.array([0, 50, 50], np.uint8)
-    ORANGE_MAX = np.array([15, 255, 255], np.uint8)
+    imgSlide = img
 
-    hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+    hMin = cv2.getTrackbarPos('HMin', 'image')
+    sMin = cv2.getTrackbarPos('SMin', 'image')
+    vMin = cv2.getTrackbarPos('VMin', 'image')
 
-    thresh = cv2.inRange(hsv_img, ORANGE_MIN, ORANGE_MAX)
+    hMax = cv2.getTrackbarPos('HMax', 'image')
+    sMax = cv2.getTrackbarPos('SMax', 'image')
+    vMax = cv2.getTrackbarPos('VMax', 'image')
+    # Set minimum and max HSV values to display
+    lower = np.array([hMin, sMin, vMin])
+    upper = np.array([hMax, sMax, vMax])
+
+    # Create HSV Image and threshold into a range.
+    hsv = cv2.cvtColor(imgSlide, cv2.COLOR_BGR2HSV)
+    mask = cv2.inRange(hsv, lower, upper)
+    output = cv2.bitwise_and(imgSlide, imgSlide, mask=mask)
+
+    # Print if there is a change in HSV value
+    if ((phMin != hMin) | (psMin != sMin) | (pvMin != vMin) | (phMax != hMax) | (psMax != sMax) | (pvMax != vMax)):
+        print("(hMin = %d , sMin = %d, vMin = %d), (hMax = %d , sMax = %d, vMax = %d)" % (
+        hMin, sMin, vMin, hMax, sMax, vMax))
+        phMin = hMin
+        psMin = sMin
+        pvMin = vMin
+        phMax = hMax
+        psMax = sMax
+        pvMax = vMax
+
+    #ORANGE_MIN = np.array([0, 50, 50], np.uint8)
+    #ORANGE_MAX = np.array([15, 255, 255], np.uint8)
+
+    hsv_img = cv2.cvtColor(output, cv2.COLOR_BGR2HSV)
+
+    thresh = cv2.inRange(hsv_img, lower, upper)
     # convert image to grayscale image
     #gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
@@ -93,31 +147,5 @@ while True:
     cv2.putText(thresh, "centroid", (cX - 25, cY - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (225, 90, 60), 2)
 
     # display the image
-    cv2.imshow("Image", thresh)
-    cv2.waitKey(1)
-
-while False:
-    img = drone.get_frame_read().frame
-    img = cv2.resize(img, (720, 480))
-
-    hav = cv2.cvtColor(img,cv2.COLOR_BGR2HSV)
-    sensitivity = 50
-
-    lower_white = np.array([0,0,255 - sensitivity])
-    upper_white = np.array([180,sensitivity,255])
-
-    mask = cv2.inRange(hav,lower_white,upper_white)
-    res = cv2.bitwise_and(img,img,mask=mask)
-
-    M = cv2.moments(res)
-
-    cX = int(M["m10"] / M["m00"])
-    cY = int(M["m01"] / M["m00"])
-
-    cv2.putText(img, "centroid",(cX - 25, cY - 25),cv2.FONT_HERSHEY_SIMPLEX, 0.5,(255,255,255),2)
-
-    cv2.imshow("Image", img)
-    cv2.imshow("mask",mask)
-    cv2.imshow("res",res)
-
+    cv2.imshow("image", thresh)
     cv2.waitKey(1)
