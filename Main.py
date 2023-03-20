@@ -6,6 +6,9 @@ import numpy as np
 import speech_recognition as sr
 from djitellopy import Tello
 import time
+from time import sleep
+import threading
+from threading import Thread
 
 
 customtkinter.set_appearance_mode("dark")
@@ -13,10 +16,10 @@ customtkinter.set_default_color_theme("blue")
 app = customtkinter.CTk()
 app.geometry("850x510")
 app.resizable(False, False)
-#############
 img = cv2.imread('Croc.jpg')
 img = cv2.resize(img,(800,300))
-###################
+
+
 class ToplevelWindow(customtkinter.CTkToplevel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -48,8 +51,6 @@ class ToplevelWindow(customtkinter.CTkToplevel):
                             "Placeholder\n"
                             "Placeholder\n")
         self.dialog.configure(state="disabled")
-        
-####################
 
 def projectLabel():
     labelName = tkinter.StringVar(value="CSC490 Drone Project")
@@ -128,127 +129,282 @@ def nothing(value):
     pass
 
 def CV2Stuff():
-    # Create a window
-    cv2.namedWindow('image')
+    try:
+        print(drone.get_battery())
+        print("ok so ignore all of the errors")
+        drone.streamon()
+        print("we don't know how to make them go away")
+        frame_read = drone.get_frame_read()
+        print("but the program still functions")
+        trackBool = False
+        dist = 50
+        cX = 0
+        cY = 0
+        angle = 10
 
 
-    # create trackbars for color change
-    cv2.createTrackbar('HMin','image',0,179,nothing) # Hue is from 0-179 for Opencv
-    cv2.createTrackbar('SMin','image',0,255,nothing)
-    cv2.createTrackbar('VMin','image',0,255,nothing)
-    cv2.createTrackbar('HMax','image',0,179,nothing)
-    cv2.createTrackbar('SMax','image',0,255,nothing)
-    cv2.createTrackbar('VMax','image',0,255,nothing)
+        def nothing(x):
+            pass
 
-    # Set default value for MAX HSV trackbars.
-    cv2.setTrackbarPos('HMax', 'image', 179)
-    cv2.setTrackbarPos('SMax', 'image', 255)
-    cv2.setTrackbarPos('VMax', 'image', 255)
+        cv2.namedWindow('image')
+        cv2.namedWindow('Video')
 
-    # Initialize to check if HSV min/max value changes
-    hMin = sMin = vMin = hMax = sMax = vMax = 0
-    phMin = psMin = pvMin = phMax = psMax = pvMax = 0
+        # create trackbars for color change
+        cv2.createTrackbar('HMin', 'image', 0, 179, nothing)  # Hue is from 0-179 for Opencv
+        cv2.createTrackbar('SMin', 'image', 0, 255, nothing)
+        cv2.createTrackbar('VMin', 'image', 0, 255, nothing)
+        cv2.createTrackbar('HMax', 'image', 0, 179, nothing)
+        cv2.createTrackbar('SMax', 'image', 0, 255, nothing)
+        cv2.createTrackbar('VMax', 'image', 0, 255, nothing)
 
-    #cam = cv2.VideoCapture(0)
-    #result, frame = cam.read()
+        # Set default value for MAX HSV trackbars.
+        cv2.setTrackbarPos('HMax', 'image', 179)
+        cv2.setTrackbarPos('SMax', 'image', 255)
+        cv2.setTrackbarPos('VMax', 'image', 255)
 
-    img = cv2.imread('Croc.jpg')
-    img = cv2.resize(img, (800, 300))
+        cv2.setTrackbarPos('HMin', 'image', 37)
+        cv2.setTrackbarPos('SMin', 'image', 49)
+        cv2.setTrackbarPos('HMax', 'image', 94)
+        cv2.setTrackbarPos('SMax', 'image', 255)
+        cv2.setTrackbarPos('VMax', 'image', 149)
 
-    cv2.resizeWindow("image",1000,800)
-    output = img
-    waitTime = 33
+        # Initialize to check if HSV min/max value changes
+        hMin = sMin = vMin = hMax = sMax = vMax = 0
+        phMin = psMin = pvMin = phMax = psMax = pvMax = 0
 
-    while(1):
+        def command():
+            loop = True
+            while loop:
+                time.sleep(1)
+                msg = input("Enter a command: ")
+                if msg == "t":
+                    try:
+                        print("Drone battery is at: " + str(drone.get_battery()))
+                        drone.takeoff()
+                        sleep(2)
+                    except: #Exception("Command '{}' was unsuccessful for {} tries. Latest response:\t'{}'") as e:
+                        print("Take off failed")
+                elif msg == "l":
+                    drone.land()
+                    trackBool = False
+                elif msg == "right":
+                    drone.rotate_clockwise(90)
+                elif msg == "left":
+                    drone.rotate_counter_clockwise(90)
+                elif msg == "s":
+                    trackThread = threading.Thread(target=track)
+                    trackThread.start()
+                elif msg == "b":
+                    print("Drone battery is at: " + str(drone.get_battery()))
+                elif msg == "x":
+                    loop = False
+        def track():
+            endTime = time.time() + 15
+            trackBool = True
+            print("Tracking started")
+            while time.time()<endTime and trackBool:
+                mult = 50
+                centerThresh = 10
+                heightDiff = int(abs((cY - (height / 2)) / (height / 2)) * mult)
+                angle = int(abs((cX - (width / 2)) / (width / 2)) * mult)
+                valX = angle * 3
+                valY = heightDiff * 2
+                if cX > ((width / 2)+centerThresh):
+                    rot = valX
+                    #drone.rotate_clockwise(angle)
+                elif cX < ((width / 2)-centerThresh):
+                    rot = -valX
+                    #drone.rotate_counter_clockwise(angle)
+                else:
+                    rot = 0
+                if cY >((height/2) + centerThresh):
+                    vert = -valY
+                    #drone.move_down(30)
+                elif cY < ((height / 2) - centerThresh):
+                    vert = valY
+                    #drone.move_up(30)
+                else:
+                    vert = 0
+                drone.send_rc_control(0,0,vert,rot)
+                sleep(.1)
+            print("Tracking ended")
+            vert = 0
+            rot = 0
+            drone.send_rc_control(0, 0, vert, rot)
 
-        # get current positions of all trackbars
-        hMin = cv2.getTrackbarPos('HMin','image')
-        sMin = cv2.getTrackbarPos('SMin','image')
-        vMin = cv2.getTrackbarPos('VMin','image')
+        commandThread = threading.Thread(target=command)
+        commandThread.start()
+        drone.streamon()
 
-        hMax = cv2.getTrackbarPos('HMax','image')
-        sMax = cv2.getTrackbarPos('SMax','image')
-        vMax = cv2.getTrackbarPos('VMax','image')
+        while True:
+            img = drone.get_frame_read().frame
+            width = 720
+            height = 480
+            img = cv2.resize(img, (width, height))
 
-        # Set minimum and max HSV values to display
-        lower = np.array([hMin, sMin, vMin])
-        upper = np.array([hMax, sMax, vMax])
+            imgSlide = img
 
-        # Create HSV Image and threshold into a range.
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        mask = cv2.inRange(hsv, lower, upper)
-        output = cv2.bitwise_and(img,img, mask= mask)
+            hMin = cv2.getTrackbarPos('HMin', 'image')
+            sMin = cv2.getTrackbarPos('SMin', 'image')
+            vMin = cv2.getTrackbarPos('VMin', 'image')
 
-        # Print if there is a change in HSV value
-        if( (phMin != hMin) | (psMin != sMin) | (pvMin != vMin) | (phMax != hMax) | (psMax != sMax) | (pvMax != vMax) ):
-            print("(hMin = %d , sMin = %d, vMin = %d), (hMax = %d , sMax = %d, vMax = %d)" % (hMin , sMin , vMin, hMax, sMax , vMax))
-            phMin = hMin
-            psMin = sMin
-            pvMin = vMin
-            phMax = hMax
-            psMax = sMax
-            pvMax = vMax
+            hMax = cv2.getTrackbarPos('HMax', 'image')
+            sMax = cv2.getTrackbarPos('SMax', 'image')
+            vMax = cv2.getTrackbarPos('VMax', 'image')
+            # Set minimum and max HSV values to display
+            lower = np.array([hMin, sMin, vMin])
+            upper = np.array([hMax, sMax, vMax])
 
-        # Display output image
-        cv2.imshow('image',output)
+            # Create HSV Image and threshold into a range.
+            hsv = cv2.cvtColor(imgSlide, cv2.COLOR_BGR2HSV)
+            mask = cv2.inRange(hsv, lower, upper)
+            output = cv2.bitwise_and(imgSlide, imgSlide, mask=mask)
 
-        # Wait longer to prevent freeze for videos.
-        if cv2.waitKey(waitTime) & 0xFF == ord('q'):
-            break
+            # Print if there is a change in HSV value
+            if ((phMin != hMin) | (psMin != sMin) | (pvMin != vMin) | (phMax != hMax) | (psMax != sMax) | (pvMax != vMax)):
+                print("(hMin = %d , sMin = %d, vMin = %d), (hMax = %d , sMax = %d, vMax = %d)" % (
+                hMin, sMin, vMin, hMax, sMax, vMax))
+                phMin = hMin
+                psMin = sMin
+                pvMin = vMin
+                phMax = hMax
+                psMax = sMax
+                pvMax = vMax
 
-    cv2.destroyAllWindows()
+            #ORANGE_MIN = np.array([0, 50, 50], np.uint8)
+            #ORANGE_MAX = np.array([15, 255, 255], np.uint8)
+
+            hsv_img = cv2.cvtColor(output, cv2.COLOR_BGR2HSV)
+
+            thresh = cv2.inRange(hsv_img, lower, upper)
+            # convert image to grayscale image
+            #gray_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+            # convert the grayscale image to binary image
+            #ret, thresh = cv2.threshold(gray_image, 127, 255, 0)
+
+            # calculate moments of binary image
+            M = cv2.moments(thresh)
+
+            # calculate x,y coordinate of center
+            if M["m00"] != 0:
+                cX = int(M["m10"] / M["m00"])
+                cY = int(M["m01"] / M["m00"])
+            else:
+                cX, cY = 0, 0
+
+            #print("X: "+str(cX) + "and Y: " + str(cY))
+            # put text and highlight the center
+            #cv2.circle(thresh, (cX, cY), 5, (255, 255, 255), -1)
+            #cv2.putText(thresh, "centroid", (cX - 25, cY - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (225, 90, 60), 2)
+
+            cv2.circle(output, (cX, cY), 5, (255, 255, 255), -1)
+            cv2.putText(output, "centroid", (cX - 25, cY - 25), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (225, 90, 60), 2)
+
+            # display the image
+            cv2.imshow("Video", output)
+            cv2.waitKey(1)
+    finally:
+        print("drone disconnecting")
+        drone.end()
+        sleep(3)
+        print("drone disconnected")
 
 def droneEvent():
-    # drone.takeoff()
-    # from os import path
+    drone.takeoff()
+    r = sr.Recognizer()
+    r.energy_threshold = 2000
+    # AUDIO_FILE = "take-off.wav"
 
-    # AUDIO_FILE = path.join(path.dirname(path.realpath(__file__)), "take-off.wav")
-    # r = sr.Recognizer()
     # with sr.AudioFile(AUDIO_FILE) as source:
     #     audio = r.record(source)
-    # text = r.recognize_sphinx(audio)
-    # with open("take_off.txt") as file:
-    #     contents = file.read()
-    #     search_word = text
-    # r = sr.Recognizer()
-    # with sr.Microphone() as source:
-    #     print("say")
-    #     r.adjust_for_ambient_noise(source)
-    #     audio = r.listen(source)
-    # with open("take-off.wav", "wb") as f:
-    #     f.write(audio.get_wav_data())
+    # print(r.recognize_google(audio))
 
 
-    r = sr.Recognizer()
-    while True:
-        with sr.Microphone() as source:
-            print ( "Speak to the computer what commands you want your tello drone to do" )
-            r.adjust_for_ambient_noise(source)
-            audio = r.listen(source)
-            text = r.recognize_sphinx(audio, keyword_entries=[("speed",0.1),("back flip", 0.1),("front flip",0.1)])
-            print(text)
-            # if "take off" in r.recognize_sphinx(audio, keyword_entries=[("take off", 0.1)]):
-            # # Make a drone command to take off into the air
-            #     drone.takeoff()
-            if "land" in r.recognize_sphinx(audio, keyword_entries=[("land", 0.1)]):
-            # Make a drone command to take off into the air
-                drone.land()
-                break
-            if "battery" in r.recognize_sphinx(audio, keyword_entries=[("battery", 0.1)]):
-                # Make a drone command to obtain battery
-                print ( drone.get_battery() )
-            if "speed" in r.recognize_sphinx(audio, keyword_entries=[("speed", 0.1)]):
-                # Make a drone command to obtain speed
-                print ( drone.get_speed() )
-            if "back flip" in r.recognize_sphinx(audio, keyword_entries=[("back flip", 0.1)]):
-                print ( drone.flip_back() )
-            if "front flip" in r.recognize_sphinx(audio, keyword_entries=[("front flip", 0.1)]):
-                print ( drone.flip_forward() )
+    breakCase = True
+    while time.time() < time.time() + 1:
 
+        try:
+            with sr.Microphone() as source:
+                drone.rotate_clockwise(1)
+                drone.rotate_counter_clockwise(1)
+                print ( "Speak to the computer what commands you want your tello drone to do" )
+                
+
+                r.adjust_for_ambient_noise(source)
+                audio = r.listen(source)
+
+                if "stop" in r.recognize_google(audio):
+                    drone.land()
+                    print("Stopping!")
+
+                else:
+                #    print(r.recognize_google(audio))
+                    if "take off" in r.recognize_google(audio):
+                    #  Make a drone command to take off into the air
+                        drone.takeoff()
+
+                    if "play dead" in r.recognize_google(audio):
+                    # Make a drone command to land
+                        drone.land()
+                        breakCase = False
+
+                    
+                    if "land" in r.recognize_google(audio):
+                    # Make a drone command to land
+                        drone.land()
+
+
+                    if "battery" in r.recognize_google(audio):
+                        # Make a drone command to obtain battery
+                        print ( drone.get_battery() )
+
+                    if "speed" in r.recognize_google(audio):
+                        # Make a drone command to obtain speed
+                        print ( drone.get_speed() )
+
+                    if "backflip" in r.recognize_google(audio):
+                        drone.flip_back()
+
+                    if "front flip" in r.recognize_google(audio):
+                        drone.flip_forward()
+                    
+                    if "good boy" in r.recognize_google(audio):
+                        drone.flip_forward()
+
+                    if "good girl" in r.recognize_google(audio):
+                        drone.flip_back()
+
+                    if "move left" in r.recognize_google(audio):
+                        drone.move_left(50)
+                    if "move right" in r.recognize_google(audio):
+                        drone.move_right(50)
+                    if "move forward" in r.recognize_google(audio):
+                        drone.move_forward(50)
+                    if "move back" in r.recognize_google(audio):
+                        drone.move_back(50)
+                    if "move up" in r.recognize_google(audio):
+                        drone.move_up(50)
+                    if "go for a walk" in r.recognize_google(audio):
+                        drone.move_forward(100)
+                        drone.rotate_counter_clockwise(90)
+                        drone.move_forward(100)
+                        drone.rotate_counter_clockwise(90)
+                        drone.move_forward(100)
+                        drone.rotate_counter_clockwise(90)
+                        drone.move_left(100)
+                        drone.rotate_counter_clockwise(90)
+                    if "go crazy" in r.recognize_google(audio):
+                        drone.flip_back()
+                        drone.flip_forward()
+                        drone.flip_left()
+
+        except:
+            breakCase = False
+            print("I didn't understand, please try again by clicking the voice button!")
 
 drone = Tello()
-#drone.connect()
-
+drone.connect()
 
 dronePicture()
 projectLabel()
