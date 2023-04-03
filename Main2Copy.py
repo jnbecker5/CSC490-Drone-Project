@@ -174,6 +174,7 @@ try:
         # calculate moments of binary image
         M = cv2.moments(thresh)
 
+
         # calculate x,y coordinate of center
         if M["m00"] != 0:
             cX = int(M["m10"] / M["m00"])
