@@ -1,3 +1,4 @@
+import math
 import tkinter
 import customtkinter
 from PIL import Image, ImageTk
@@ -10,7 +11,7 @@ from time import sleep
 import threading
 from threading import Thread
 
-
+#Create main UI window
 customtkinter.set_appearance_mode("dark")
 customtkinter.set_default_color_theme("blue")
 app = customtkinter.CTk()
@@ -19,7 +20,7 @@ app.resizable(False, False)
 img = cv2.imread('Croc.jpg')
 img = cv2.resize(img,(800,300))
 
-
+#Create secondary window for when user clicks "Show available Commands"
 class ToplevelWindow(customtkinter.CTkToplevel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -52,8 +53,9 @@ class ToplevelWindow(customtkinter.CTkToplevel):
                             "Placeholder\n")
         self.dialog.configure(state="disabled")
 
+#Main window label
 def projectLabel():
-    labelName = tkinter.StringVar(value="CSC490 Drone Project")
+    labelName = tkinter.StringVar(value="Drone Project")
     label = customtkinter.CTkLabel(master=app,
                                    textvariable=labelName,
                                    width=250,
@@ -63,9 +65,10 @@ def projectLabel():
                                    corner_radius=8)
     label.pack(padx=20, pady=10)
 
+#Button which initializes TopLevelWindow class
 def commandButton():
     infoButton = customtkinter.CTkButton(master=app,
-                                         text="Show available commands",
+                                         text="Show Available Commands",
                                          command=ToplevelWindow)
     infoButton.pack(side=tkinter.BOTTOM, pady=10)
 
@@ -89,7 +92,7 @@ def commandButton():
 def userInput():
     global entry
     entry = customtkinter.CTkEntry(master=app,
-                                   placeholder_text="Enter a command: ")
+                                   placeholder_text="Enter a Command: ")
     entry.pack(padx=20, pady=10)
 
 def enterFunction():
@@ -106,15 +109,20 @@ def entryAndClear():
     entrybutton = customtkinter.CTkButton(master=app,
                                           text="Enter",
                                           command=enterFunction)
-    entrybutton.pack(padx=2, pady=5)
+    entrybutton.pack(padx=2, pady=40)
     testButton = customtkinter.CTkButton(master=app,
-                                          text="Color Changes",
+                                          text="Object Tracking",
                                           command=CV2Stuff)
     testButton.pack(padx=2, pady=5)
     dronebutton = customtkinter.CTkButton(master=app,
-                                          text="Click to speak to drone",
-                                          command=droneEvent)
+                                          text="Voice Control",
+                                          command=droneEventStart)
     dronebutton.pack(padx=2, pady=10)
+
+def droneEventStart():
+    voiceThread = threading.Thread(target=droneEvent)
+    voiceThread.start()
+
 
 
 def dronePicture():
@@ -127,6 +135,10 @@ def dronePicture():
 
 def nothing(value):
     pass
+
+def CV2Thread():
+    CVThread = threading.Thread(target=CV2Stuff)
+    CVThread.start()
 
 def CV2Stuff():
     try:
@@ -148,6 +160,12 @@ def CV2Stuff():
 
         cv2.namedWindow('image')
         cv2.namedWindow('Video')
+        def back():
+            cv2.destroyWindow('Video')
+            cv2.destroyWindow('image')
+        #
+
+
 
         # create trackbars for color change
         cv2.createTrackbar('HMin', 'image', 0, 179, nothing)  # Hue is from 0-179 for Opencv
@@ -156,6 +174,7 @@ def CV2Stuff():
         cv2.createTrackbar('HMax', 'image', 0, 179, nothing)
         cv2.createTrackbar('SMax', 'image', 0, 255, nothing)
         cv2.createTrackbar('VMax', 'image', 0, 255, nothing)
+        cv2.createTrackbar('Dont Touch This', 'image', 0, 1,back)
 
         # Set default value for MAX HSV trackbars.
         cv2.setTrackbarPos('HMax', 'image', 179)
@@ -303,105 +322,134 @@ def CV2Stuff():
 
             # display the image
             cv2.imshow("Video", output)
+
             cv2.waitKey(1)
     finally:
         print("drone disconnecting")
-        drone.end()
+        #drone.end()
+        drone.streamoff()
         sleep(3)
         print("drone disconnected")
 
 def droneEvent():
     drone.takeoff()
+    drone.set_speed(60)
     r = sr.Recognizer()
     r.energy_threshold = 2000
     # AUDIO_FILE = "take-off.wav"
 
     # with sr.AudioFile(AUDIO_FILE) as source:
     #     audio = r.record(source)
-    # print(r.recognize_google(audio))
+    # print(x)
 
 
     breakCase = True
-    while time.time() < time.time() + 1:
+    while (breakCase == True):
 
         try:
             with sr.Microphone() as source:
-                drone.rotate_clockwise(1)
-                drone.rotate_counter_clockwise(1)
-                print ( "Speak to the computer what commands you want your tello drone to do" )
-                
 
+                drone.get_battery()
+                print ( "Speak to the computer what commands you want your tello drone to do" )
                 r.adjust_for_ambient_noise(source)
                 audio = r.listen(source)
+                #Create an instance of speech recognition
+                x = r.recognize_google(audio)
 
-                if "stop" in r.recognize_google(audio):
+######################################
+
+                #Commands to make it stop.
+                if "stop" in x:
                     drone.land()
                     print("Stopping!")
+                    breakCase = False
+                if "help land the drone" in x:
+                    drone.land()
+                    print("Stopping!")
+                    breakCase = False
+                if "its flying away" in x:
+                    drone.land()
+                    print("Stopping!")
+                    breakCase = False
+                if "break" in x:
+                    drone.land()
+                    print("Stopping!")
+                    breakCase = False
+                if "land" in x:
+                    # Make a drone command to land
+                    drone.land()
+                    breakCase = False
+
+######################################
 
                 else:
-                #    print(r.recognize_google(audio))
-                    if "take off" in r.recognize_google(audio):
+
+                    if "take off" in x:
                     #  Make a drone command to take off into the air
                         drone.takeoff()
 
-                    if "play dead" in r.recognize_google(audio):
+                    if "play dead" in x:
                     # Make a drone command to land
                         drone.land()
-                        breakCase = False
-
                     
-                    if "land" in r.recognize_google(audio):
-                    # Make a drone command to land
-                        drone.land()
+                    if "rotate left" in x:
+                        drone.rotate_clockwise(90)
+                    
+                    if "rotate right" in x:
+                        drone.rotate_counter_clockwise(90)
 
-
-                    if "battery" in r.recognize_google(audio):
-                        # Make a drone command to obtain battery
-                        print ( drone.get_battery() )
-
-                    if "speed" in r.recognize_google(audio):
-                        # Make a drone command to obtain speed
+                    if "speed" in x:
+                    # Make a drone command to obtain speed
                         print ( drone.get_speed() )
 
-                    if "backflip" in r.recognize_google(audio):
+                    if "backflip" in x:
+                    # Make drone flip backward
                         drone.flip_back()
 
-                    if "front flip" in r.recognize_google(audio):
-                        drone.flip_forward()
-                    
-                    if "good boy" in r.recognize_google(audio):
+                    if "front flip" in x:
+                    # Make drone flip forward
                         drone.flip_forward()
 
-                    if "good girl" in r.recognize_google(audio):
-                        drone.flip_back()
-
-                    if "move left" in r.recognize_google(audio):
+                    if "move left" in x:
+                    # Make the drone move left
                         drone.move_left(50)
-                    if "move right" in r.recognize_google(audio):
+
+                    if "move right" in x:
+                    # Make the drone move right
                         drone.move_right(50)
-                    if "move forward" in r.recognize_google(audio):
+
+                    if "move forward" in x:
+                    # Make the drone move forward
                         drone.move_forward(50)
-                    if "move back" in r.recognize_google(audio):
+
+                    if "move back" in x:
+                    # Make the drone move backward
                         drone.move_back(50)
-                    if "move up" in r.recognize_google(audio):
+
+                    if "move up" in x:
+                    # Make the drone move up
                         drone.move_up(50)
-                    if "go for a walk" in r.recognize_google(audio):
+
+                    if "go for a walk" in x:
+                    # Make the drone move around "randomly"
                         drone.move_forward(100)
                         drone.rotate_counter_clockwise(90)
                         drone.move_forward(100)
                         drone.rotate_counter_clockwise(90)
                         drone.move_forward(100)
                         drone.rotate_counter_clockwise(90)
-                        drone.move_left(100)
+                        drone.move_forward(100)
                         drone.rotate_counter_clockwise(90)
-                    if "go crazy" in r.recognize_google(audio):
+
+                    if "shake and bake" in x:
+                    # Make the drone "go crazy"
                         drone.flip_back()
-                        drone.flip_forward()
+                        drone.flip_left()
                         drone.flip_left()
 
         except:
-            breakCase = False
-            print("I didn't understand, please try again by clicking the voice button!")
+            print("I didn't understand, please try again!")
+            droneEvent()
 
 drone = Tello()
 drone.connect()
