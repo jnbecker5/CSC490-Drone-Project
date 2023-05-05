@@ -17,4 +17,4 @@ numpy
 
 
 
-The main file, when run, will bring up the user interface. 
+The Main,py, when run, will bring up the user interface as well as the voice control aspect of the program. Main2Copy.py is the main color tracking file.
